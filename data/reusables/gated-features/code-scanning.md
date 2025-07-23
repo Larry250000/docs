@@ -1,1 +1,14 @@
-{% data variables.product.prodname_code_scanning_capc %} is available {% if currentVersion == "free-pro-team@latest" %}in public repositories, and in private repositories owned by organizations with {% else %}if you have {% endif %}an {% data variables.product.prodname_advanced_security %} license. {% data reusables.gated-features.more-info %}
+{% data variables.product.prodname_code_scanning_caps %} is available for the following repository types:
+
+{%- ifversion fpt %}
+* Public repositories on {% data variables.product.prodname_dotcom_the_website %}
+* Organization-owned repositories on {% data variables.product.prodname_team %} with [{% data variables.product.prodname_GH_code_security %}](/get-started/learning-about-github/about-github-advanced-security) enabled
+
+{%- elsif ghec %}
+* Public repositories on {% data variables.product.prodname_dotcom_the_website %}
+* Organization-owned repositories on {% data variables.product.prodname_team %} or {% data variables.product.prodname_ghe_cloud %} with [{% data variables.product.prodname_GH_code_security %}](/get-started/learning-about-github/about-github-advanced-security) enabled
+
+{%- elsif ghes %}
+* Organization-owned repositories with [{% data variables.product.prodname_GH_code_security %}](/get-started/learning-about-github/about-github-advanced-security) enabled
+
+{% endif %}

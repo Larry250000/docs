@@ -1,219 +1,105 @@
 ---
 title: Events that trigger workflows
-intro: 'You can configure your workflows to run when specific activity on {% data variables.product.product_name %} happens, at a scheduled time, or when an event outside of {% data variables.product.product_name %} occurs.'
-product: '{% data reusables.gated-features.actions %}'
-miniTocMaxHeadingLevel: 4
+intro: 'You can configure your workflows to run when specific activity on {% data variables.product.github %} happens, at a scheduled time, or when an event outside of {% data variables.product.github %} occurs.'
 redirect_from:
   - /articles/events-that-trigger-workflows
   - /github/automating-your-workflow-with-github-actions/events-that-trigger-workflows
   - /actions/automating-your-workflow-with-github-actions/events-that-trigger-workflows
+  - /actions/learn-github-actions/events-that-trigger-workflows
+  - /actions/using-workflows/events-that-trigger-workflows
+  - /actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows
 versions:
-  free-pro-team: '*'
-  enterprise-server: '>=2.22'
+  fpt: '*'
+  ghes: '*'
+  ghec: '*'
+shortTitle: Events that trigger workflows
 ---
 
-{% data reusables.actions.enterprise-beta %}
-{% data reusables.actions.enterprise-github-hosted-runners %}
+## About events that trigger workflows
 
-### Configuring workflow events
+Workflow triggers are events that cause a workflow to run. For more information about how to use workflow triggers, see [AUTOTITLE](/actions/using-workflows/triggering-a-workflow).
 
-You can configure workflows to run for one or more events using the `on` workflow syntax. For more information, see "[Workflow syntax for {% data variables.product.prodname_actions %}](/articles/workflow-syntax-for-github-actions#on)."
+Some events have multiple activity types. For these events, you can specify which activity types will trigger a workflow run. For more information about what each activity type means, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads).
 
-{% data reusables.github-actions.actions-on-examples %}
+> [!NOTE]
+> Not all webhook events trigger workflows.
 
-{% note %}
-
-**Note:** You cannot trigger new workflow runs using the `GITHUB_TOKEN`. For more information, see "[Triggering new workflows using a personal access token](#triggering-new-workflows-using-a-personal-access-token)."
-
-{% endnote %}
-
-The following steps occur to trigger a workflow run:
-
-1. An event occurs on your repository, and the resulting event has an associated commit SHA and Git ref.
-2. The `.github/workflows` directory in your repository is searched for workflow files at the associated commit SHA or Git ref. The workflow files must be present in that commit SHA or Git ref to be considered.
-
-  For example, if the event occurred on a particular repository branch, then the workflow files must be present in the repository on that branch.
-1. The workflow files for that commit SHA and Git ref are inspected, and a new workflow run is triggered for any workflows that have `on:` values that match the triggering event.
-
-  The workflow runs on your repository's code at the same commit SHA and Git ref that triggered the event. When a workflow runs, {% data variables.product.product_name %} sets the `GITHUB_SHA` (commit SHA) and `GITHUB_REF` (Git ref) environment variables in the runner environment. For more information, see "[Using environment variables](/actions/automating-your-workflow-with-github-actions/using-environment-variables)."
-
-### Scheduled events
-
-The `schedule` event allows you to trigger a workflow at a scheduled time.
-
-#### `schedule`
+## `branch_protection_rule`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| n/a | n/a | Last commit on default branch | Default branch | When the scheduled workflow is set to run. A scheduled workflow uses [POSIX cron syntax](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07). For more information, see "[Triggering a workflow with events](/articles/configuring-a-workflow/#triggering-a-workflow-with-events)." |
+| [`branch_protection_rule`](/webhooks-and-events/webhooks/webhook-events-and-payloads#branch_protection_rule) | - `created`<br/>- `edited`<br/>- `deleted` | Last commit on default branch | Default branch |
 
-{% data reusables.repositories.actions-scheduled-workflow-example %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#branch_protection_rule). {% data reusables.developer-site.limit_workflow_to_activity_types %}
 
-Cron syntax has five fields separated by a space, and each field represents a unit of time.
+{% data reusables.actions.branch-requirement %}
 
-```
-┌───────────── minute (0 - 59)
-│ ┌───────────── hour (0 - 23)
-│ │ ┌───────────── day of the month (1 - 31)
-│ │ │ ┌───────────── month (1 - 12 or JAN-DEC)
-│ │ │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
-│ │ │ │ │                                   
-│ │ │ │ │
-│ │ │ │ │
-* * * * *
-```
+Runs your workflow when branch protection rules in the workflow repository are changed. For more information about branch protection rules, see [AUTOTITLE](/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches). For information about the branch protection rule APIs, see [AUTOTITLE](/graphql/reference/objects#branchprotectionrule) in the GraphQL API documentation or [AUTOTITLE](/rest/branches).
 
-You can use these operators in any of the five fields:
-
-| Operator | Description | Example |
-| -------- | ----------- | ------- |
-| * | Any value | `* * * * *` runs every minute of every day. |
-| , | Value list separator | `2,10 4,5 * * *` runs at minute 2 and 10 of the 4th and 5th hour of every day. |
-| - | Range of values | `0 4-6 * * *` runs at minute 0 of the 4th, 5th, and 6th hour. |
-| / | Step values | `20/15 * * * *` runs every 15 minutes starting from minute 20 through 59 (minutes 20, 35, and 50). |
-
-{% note %}
-
-**Note:** {% data variables.product.prodname_actions %} does not support the non-standard syntax `@yearly`, `@monthly`, `@weekly`, `@daily`, `@hourly`, and `@reboot`.
-
-{% endnote %}
-
-You can use [crontab guru](https://crontab.guru/) to help generate your cron syntax and confirm what time it will run. To help you get started, there is also a list of [crontab guru examples](https://crontab.guru/examples.html).
-
-### Manual events
-
-You can manually trigger workflow runs. To trigger specific workflows in a repository, use the `workflow_dispatch` event. To trigger more than one workflow in a repository and create custom events and event types, use the `repository_dispatch` event. 
-
-#### `workflow_dispatch`
-
-| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
-| ------------------ | ------------ | ------------ | ------------------|
-| [workflow_dispatch](/webhooks/event-payloads/#workflow_dispatch) | n/a | Last commit on the `GITHUB_REF` branch | Branch that received dispatch |
-
-You can configure custom-defined input properties, default input values, and required inputs for the event directly in your workflow. When the workflow runs, you can access the input values in the `github.event.inputs` context. For more information, see "[Context and expression syntax for {% data variables.product.prodname_actions %}](/actions/reference/context-and-expression-syntax-for-github-actions#github-context)."
-
-You can manually trigger a workflow run using the {% data variables.product.product_name %} API and from {% data variables.product.product_name %}. For more information, see "[Manually running a workflow](/actions/managing-workflow-runs/manually-running-a-workflow)."
-
- When you trigger the event on {% data variables.product.prodname_dotcom %}, you can provide the `ref` and any `inputs` directly on {% data variables.product.prodname_dotcom %}. For more information, see "[Using inputs and outputs with an action](/actions/learn-github-actions/finding-and-customizing-actions#using-inputs-and-outputs-with-an-action)."
-
- To trigger the custom `workflow_dispatch` webhook event using the REST API, you must send a `POST` request to a {% data variables.product.prodname_dotcom %} API endpoint and provide the `ref` and any required `inputs`. For more information, see the "[Create a workflow dispatch event](/rest/reference/actions/#create-a-workflow-dispatch-event)" REST API endpoint.
-
-##### Example
-
-To use the `workflow_dispatch` event, you need to include it as a trigger in your GitHub Actions workflow file. The example below only runs the workflow when it's manually triggered:
-
-```yaml
-on: workflow_dispatch
-```
-
-##### Example workflow configuration
-
-This example defines the `name` and `home` inputs and prints them using the `github.event.inputs.name` and `github.event.inputs.home` contexts. If a `home` isn't provided, the default value 'The Octoverse' is printed.
-
-{% raw %}
-```yaml
-name: Manually triggered workflow
-on:
-  workflow_dispatch:
-    inputs:
-      name:
-        description: 'Person to greet'
-        required: true
-        default: 'Mona the Octocat'
-      home:
-        description: 'location'
-        required: false
-        default: 'The Octoverse'
-
-jobs:
-  say_hello:
-    runs-on: ubuntu-latest
-    steps:
-    - run: |
-        echo "Hello ${{ github.event.inputs.name }}!"
-        echo "- in ${{ github.event.inputs.home }}!"
-```
-{% endraw %}
-
-#### `repository_dispatch`
-
-| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
-| ------------------ | ------------ | ------------ | ------------------|
-| [repository_dispatch](/webhooks/event-payloads/#repository_dispatch) | n/a | Last commit on the `GITHUB_REF` branch | Branch that received dispatch |
-
-{% data reusables.github-actions.branch-requirement %}
-
-You can use the {% data variables.product.product_name %} API to trigger a webhook event called [`repository_dispatch`](/webhooks/event-payloads/#repository_dispatch) when you want to trigger a workflow for activity that happens outside of {% data variables.product.prodname_dotcom %}. For more information, see "[Create a repository dispatch event](/rest/reference/repos#create-a-repository-dispatch-event)."
-
-To trigger the custom `repository_dispatch` webhook event, you must send a `POST` request to a {% data variables.product.product_name %} API endpoint and provide an `event_type` name to describe the activity type. To trigger a workflow run, you must also configure your workflow to use the `repository_dispatch` event.
-
-##### Example
-
-By default, all `event_types` trigger a workflow to run. You can limit your workflow to run when a specific `event_type` value is sent in the `repository_dispatch` webhook payload. You define the event types sent in the `repository_dispatch` payload when you create the repository dispatch event.
+For example, you can run a workflow when a branch protection rule has been `created` or `deleted`:
 
 ```yaml
 on:
-  repository_dispatch:
-    types: [opened, deleted]
+  branch_protection_rule:
+    types: [created, deleted]
 ```
 
-### Webhook events
-
-You can configure your workflow to run when webhook events are created on {% data variables.product.product_name %}. Some events have more than one activity type that triggers the event. If more than one activity type triggers the event, you can specify which activity types will trigger the workflow to run. For more information, see "[Webhooks](/webhooks)." 
-
-#### `check_run`
-
-Runs your workflow anytime the `check_run` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Check runs](/rest/reference/checks#runs)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `check_run`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`check_run`](/webhooks/event-payloads/#check_run) | - `created`<br/>- `rerequested`<br/>- `completed`<br/>- `requested_action` | Last commit on default branch | Default branch |
+| [`check_run`](/webhooks-and-events/webhooks/webhook-events-and-payloads#check_run) | - `created`<br/>- `rerequested`<br/>- `completed`<br/>- `requested_action` | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#check_run). {% data reusables.developer-site.limit_workflow_to_activity_types %}
 
-For example, you can run a workflow when a check run has been `rerequested` or `requested_action`.
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when activity related to a check run occurs. A check run is an individual test that is part of a check suite. For information, see [AUTOTITLE](/rest/guides/using-the-rest-api-to-interact-with-checks). For information about the check run APIs, see [AUTOTITLE](/graphql/reference/objects#checkrun) in the GraphQL API documentation or [AUTOTITLE](/rest/checks/runs).
+
+For example, you can run a workflow when a check run has been `rerequested` or `completed`.
 
 ```yaml
 on:
   check_run:
-    types: [rerequested, requested_action]
+    types: [rerequested, completed]
 ```
 
-#### `check_suite`
-
-Runs your workflow anytime the `check_suite` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Check suites](/rest/reference/checks#suites)."
-
-{% data reusables.github-actions.branch-requirement %}
-
-{% note %}
-
-**Note:** To prevent recursive workflows, this event does not trigger workflows if the check suite was created by {% data variables.product.prodname_actions %}.
-
-{% endnote %}
+## `check_suite`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`check_suite`](/webhooks/event-payloads/#check_suite) | - `completed`<br/>- `requested`<br/>- `rerequested`<br/> | Last commit on default branch | Default branch |
+| [`check_suite`](/webhooks-and-events/webhooks/webhook-events-and-payloads#check_suite) | - `completed` | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#check_suite). Although only the `completed` activity type is supported, specifying the activity type will keep your workflow specific if more activity types are added in the future. {% data reusables.developer-site.limit_workflow_to_activity_types %}
 
-For example, you can run a workflow when a check suite has been `rerequested` or `completed`.
+{% data reusables.actions.branch-requirement %}
+
+> [!NOTE]
+> To prevent recursive workflows, this event does not trigger workflows if the check suite was created by {% data variables.product.prodname_actions %}.
+
+Runs your workflow when check suite activity occurs. A check suite is a collection of the check runs created for a specific commit. Check suites summarize the status and conclusion of the check runs that are in the suite. For information, see [AUTOTITLE](/rest/guides/using-the-rest-api-to-interact-with-checks). For information about the check suite APIs, see [AUTOTITLE](/graphql/reference/objects#checksuite) in the GraphQL API documentation or [AUTOTITLE](/rest/checks/suites).
+
+For example, you can run a workflow when a check suite has been `completed`.
 
 ```yaml
 on:
   check_suite:
-    types: [rerequested, completed]
+    types: [completed]
 ```
 
-#### `create`
-
-Runs your workflow anytime someone creates a branch or tag, which triggers the `create` event. For information about the REST API, see "[Create a reference](/rest/reference/git#create-a-reference)."
+## `create`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`create`](/webhooks/event-payloads/#create) | n/a | Last commit on the created branch or tag | Branch or tag created |
+| [`create`](/webhooks-and-events/webhooks/webhook-events-and-payloads#create) | Not applicable | Last commit on the created branch or tag | Branch or tag created |
+
+> [!NOTE]
+> An event will not be created when you create more than three tags at once.
+
+Runs your workflow when someone creates a Git reference (Git branch or tag) in the workflow's repository. For information about the APIs to create a Git reference, see [AUTOTITLE](/graphql/reference/mutations#createref) in the GraphQL API documentation or [AUTOTITLE](/rest/git/refs#create-a-reference).
 
 For example, you can run a workflow when the `create` event occurs.
 
@@ -222,15 +108,18 @@ on:
   create
 ```
 
-#### `delete`
-
-Runs your workflow anytime someone deletes a branch or tag, which triggers the `delete` event. For information about the REST API, see "[Delete a reference](/rest/reference/git#delete-a-reference)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `delete`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`delete`](/webhooks/event-payloads/#delete) | n/a | Last commit on default branch | Default branch |
+| [`delete`](/webhooks-and-events/webhooks/webhook-events-and-payloads#delete) | Not applicable | Last commit on default branch | Default branch |
+
+{% data reusables.actions.branch-requirement %}
+
+> [!NOTE]
+> An event will not be created when you delete more than three tags at once.
+
+Runs your workflow when someone deletes a Git reference (Git branch or tag) in the workflow's repository. For information about the APIs to delete a Git reference, see [AUTOTITLE](/graphql/reference/mutations#deleteref) in the GraphQL API documentation or [AUTOTITLE](/rest/git/refs#delete-a-reference).
 
 For example, you can run a workflow when the `delete` event occurs.
 
@@ -239,13 +128,13 @@ on:
   delete
 ```
 
-#### `deployment`
-
-Runs your workflow anytime someone creates a deployment, which triggers the `deployment` event. Deployments created with a commit SHA may not have a Git ref. For information about the REST API, see "[Deployments](/rest/reference/repos#deployments)."
+## `deployment`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`deployment`](/webhooks/event-payloads/#deployment) | n/a | Commit to be deployed | Branch or tag to be deployed (empty if commit)|
+| [`deployment`](/webhooks-and-events/webhooks/webhook-events-and-payloads#deployment) | Not applicable | Commit to be deployed | Branch or tag to be deployed (empty if created with a commit SHA)|
+
+Runs your workflow when someone creates a deployment in the workflow's repository. Deployments created with a commit SHA may not have a Git ref. For information about the APIs to create a deployment, see [AUTOTITLE](/graphql/reference/mutations#createdeployment) in the GraphQL API documentation or [AUTOTITLE](/rest/repos#deployments).
 
 For example, you can run a workflow when the `deployment` event occurs.
 
@@ -254,13 +143,16 @@ on:
   deployment
 ```
 
-#### `deployment_status`
-
-Runs your workflow anytime a third party provides a deployment status, which triggers the `deployment_status` event. Deployments created with a commit SHA may not have a Git ref. For information about the REST API, see "[Create a deployment status](/rest/reference/repos#create-a-deployment-status)."
+## `deployment_status`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`deployment_status`](/webhooks/event-payloads/#deployment_status) | n/a | Commit to be deployed | Branch or tag to be deployed (empty if commit)|
+| [`deployment_status`](/webhooks-and-events/webhooks/webhook-events-and-payloads#deployment_status) | Not applicable | Commit to be deployed | Branch or tag to be deployed (empty if commit)|
+
+> [!NOTE]
+> When a deployment status's state is set to `inactive`, a workflow run will not be triggered.
+
+Runs your workflow when a third party provides a deployment status. Deployments created with a commit SHA may not have a Git ref. For information about the APIs to create a deployment status, see [AUTOTITLE](/graphql/reference/mutations#createdeploymentstatus) in the GraphQL API documentation or [AUTOTITLE](/rest/deployments#create-a-deployment-status).
 
 For example, you can run a workflow when the `deployment_status` event occurs.
 
@@ -269,15 +161,61 @@ on:
   deployment_status
 ```
 
-#### `fork`
-
-Runs your workflow anytime when someone forks a repository, which triggers the `fork` event. For information about the REST API, see "[Create a fork](/rest/reference/repos#create-a-fork)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `discussion`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`fork`](/webhooks/event-payloads/#fork) | n/a | Last commit on default branch |  Default branch |
+| [`discussion`](/webhooks-and-events/webhooks/webhook-events-and-payloads#discussion) | - `created`<br/>- `edited`<br/>- `deleted`<br/>- `transferred`<br/>- `pinned`<br/>- `unpinned`<br/>- `labeled`<br/>- `unlabeled`<br/>- `locked`<br/>- `unlocked`<br/>- `category_changed`<br/> - `answered`<br/> - `unanswered` | Last commit on default branch | Default branch |
+
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#discussion). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+{% data reusables.actions.branch-requirement %}
+
+{% data reusables.webhooks.discussions-webhooks-beta %}
+
+Runs your workflow when a discussion in the workflow's repository is created or modified. For activity related to comments on a discussion, use the [`discussion_comment`](#discussion_comment) event. For more information about discussions, see [AUTOTITLE](/discussions/collaborating-with-your-community-using-discussions/about-discussions). For information about the GraphQL API, see [AUTOTITLE](/graphql/reference/objects#discussion).
+
+For example, you can run a workflow when a discussion has been `created`, `edited`, or `answered`.
+
+```yaml
+on:
+  discussion:
+    types: [created, edited, answered]
+```
+
+## `discussion_comment`
+
+| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
+| --------------------- | -------------- | ------------ | -------------|
+| [`discussion_comment`](/webhooks-and-events/webhooks/webhook-events-and-payloads#discussion_comment) | - `created`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
+
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#discussion_comment). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+{% data reusables.actions.branch-requirement %}
+
+{% data reusables.webhooks.discussions-webhooks-beta %}
+
+Runs your workflow when a comment on a discussion in the workflow's repository is created or modified. For activity related to a discussion as opposed to comments on the discussion, use the [`discussion`](#discussion) event. For more information about discussions, see [AUTOTITLE](/discussions/collaborating-with-your-community-using-discussions/about-discussions). For information about the GraphQL API, see [AUTOTITLE](/graphql/reference/objects#discussion).
+
+For example, you can run a workflow when a discussion comment has been `created` or `deleted`.
+
+```yaml
+on:
+  discussion_comment:
+    types: [created, deleted]
+```
+
+## `fork`
+
+| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
+| --------------------- | -------------- | ------------ | -------------|
+| [`fork`](/webhooks-and-events/webhooks/webhook-events-and-payloads#fork) | Not applicable | Last commit on default branch |  Default branch |
+
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when someone forks a repository. For information about the REST API, see [AUTOTITLE](/rest/repos/forks#create-a-fork).
 
 For example, you can run a workflow when the `fork` event occurs.
 
@@ -286,15 +224,15 @@ on:
   fork
 ```
 
-#### `gollum`
-
-Runs your workflow when someone creates or updates a Wiki page, which triggers the `gollum` event.
-
-{% data reusables.github-actions.branch-requirement %}
+## `gollum`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`gollum`](/webhooks/event-payloads/#gollum) | n/a | Last commit on default branch |  Default branch |
+| [`gollum`](/webhooks-and-events/webhooks/webhook-events-and-payloads#gollum) | Not applicable | Last commit on default branch |  Default branch |
+
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when someone creates or updates a Wiki page. For more information, see [AUTOTITLE](/communities/documenting-your-project-with-wikis/about-wikis).
 
 For example, you can run a workflow when the `gollum` event occurs.
 
@@ -303,19 +241,20 @@ on:
   gollum
 ```
 
-#### `issue_comment`
-
-Runs your workflow anytime the `issue_comment` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Issue comments](/developers/webhooks-and-events/webhook-events-and-payloads#issue_comment)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `issue_comment`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`issue_comment`](/rest/reference/activity#issue_comment) | - `created`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
+| [`issue_comment`](/webhooks-and-events/webhooks/webhook-events-and-payloads#issue_comment) | - `created`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#issue_comment). {% data reusables.developer-site.limit_workflow_to_activity_types %}
 
-For example, you can run a workflow when an issue comment has been `created` or `deleted`.
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when an issue or pull request comment is created, edited, or deleted. For information about the issue comment APIs, see [AUTOTITLE](/graphql/reference/objects#issuecomment) in the GraphQL API documentation or [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#issue_comment) in the REST API documentation.
+
+For example, you can run a workflow when an issue or pull request comment has been `created` or `deleted`.
 
 ```yaml
 on:
@@ -323,11 +262,12 @@ on:
     types: [created, deleted]
 ```
 
-The `issue_comment` event occurs for comments on both issues and pull requests. To determine whether the `issue_comment` event was triggered from an issue or pull request, you can check the event payload for the `issue.pull_request` property and use it as a condition to skip a job.
+### `issue_comment` on issues only or pull requests only
 
-For example, you can choose to run the `pr_commented` job when comment events occur in a pull request, and the `issue_commented` job when comment events occur in an issue.
+The `issue_comment` event occurs for comments on both issues and pull requests. You can use the `github.event.issue.pull_request` property in a conditional to take different action depending on whether the triggering object was an issue or pull request.
 
-{% raw %}
+For example, this workflow will run the `pr_commented` job only if the `issue_comment` event originated from a pull request. It will run the `issue_commented` job only if the `issue_comment` event originated from an issue.
+
 ```yaml
 on: issue_comment
 
@@ -335,34 +275,38 @@ jobs:
   pr_commented:
     # This job only runs for pull request comments
     name: PR comment
-    if: ${{ github.event.issue.pull_request }}
+    if: {% raw %}${{ github.event.issue.pull_request }}{% endraw %}
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "Comment on PR #${{ github.event.issue.number }}"
+          echo A comment on PR $NUMBER
+        env:
+          NUMBER: {% raw %}${{ github.event.issue.number }}{% endraw %}
 
-  issue-commented:
+  issue_commented:
     # This job only runs for issue comments
     name: Issue comment
-    if: ${{ !github.event.issue.pull_request }}
+    if: {% raw %}${{ !github.event.issue.pull_request }}{% endraw %}
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "Comment on issue #${{ github.event.issue.number }}"
+          echo A comment on issue $NUMBER
+        env:
+          NUMBER: {% raw %}${{ github.event.issue.number }}{% endraw %}
 ```
-{% endraw %}
 
-#### `issues`
-
-Runs your workflow anytime the `issues` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Issues](/rest/reference/issues)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `issues`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`issues`](/webhooks/event-payloads/#issues) | - `opened`<br/>- `edited`<br/>- `deleted`<br/>- `transferred`<br/>- `pinned`<br/>- `unpinned`<br/>- `closed`<br/>- `reopened`<br/>- `assigned`<br/>- `unassigned`<br/>- `labeled`<br/>- `unlabeled`<br/>- `locked`<br/>- `unlocked`<br/>- `milestoned`<br/> - `demilestoned` | Last commit on default branch | Default branch |
+| [`issues`](/webhooks-and-events/webhooks/webhook-events-and-payloads#issues) | - `opened`<br/>- `edited`<br/>- `deleted`<br/>- `transferred`<br/>- `pinned`<br/>- `unpinned`<br/>- `closed`<br/>- `reopened`<br/>- `assigned`<br/>- `unassigned`<br/>- `labeled`<br/>- `unlabeled`<br/>- `locked`<br/>- `unlocked`<br/>- `milestoned`<br/> - `demilestoned`<br/> - `typed`<br/> - `untyped` | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#issues). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when an issue in the workflow's repository is created or modified. For activity related to comments in an issue, use the [`issue_comment`](#issue_comment) event. For more information about issues, see [AUTOTITLE](/issues/tracking-your-work-with-issues/about-issues). For information about the issue APIs, see [AUTOTITLE](/graphql/reference/objects#issue) in the GraphQL API documentation or [AUTOTITLE](/rest/issues).
 
 For example, you can run a workflow when an issue has been `opened`, `edited`, or `milestoned`.
 
@@ -372,17 +316,20 @@ on:
     types: [opened, edited, milestoned]
 ```
 
-#### `label`
-
-Runs your workflow anytime the `label` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see  "[Labels](/rest/reference/issues#labels)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `label`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`label`](/webhooks/event-payloads/#label) | - `created`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
+| [`label`](/webhooks-and-events/webhooks/webhook-events-and-payloads#label) | - `created`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#label). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when a label in your workflow's repository is created or modified. For more information about labels, see [AUTOTITLE](/issues/using-labels-and-milestones-to-track-work/managing-labels). For information about the label APIs, see [AUTOTITLE](/graphql/reference/objects#label) in the GraphQL API documentation or [AUTOTITLE](/rest/issues/labels).
+
+If you want to run your workflow when a label is added to or removed from an issue, pull request, or discussion, use the `labeled` or `unlabeled` activity types for the [`issues`](#issues), [`pull_request`](#pull_request), [`pull_request_target`](#pull_request_target), or [`discussion`](#discussion) events instead.
 
 For example, you can run a workflow when a label has been `created` or `deleted`.
 
@@ -392,17 +339,42 @@ on:
     types: [created, deleted]
 ```
 
-#### `milestone`
-
-Runs your workflow anytime the `milestone` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Milestones](/rest/reference/issues#milestones)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `merge_group`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`milestone`](/webhooks/event-payloads/#milestone) | - `created`<br/>- `closed`<br/>- `opened`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
+| [`merge_group`](/webhooks-and-events/webhooks/webhook-events-and-payloads#merge_group) | `checks_requested` | SHA of the merge group | Ref of the merge group |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> * {% data reusables.developer-site.multiple_activity_types %} Although only the `checks_requested` activity type is supported, specifying the activity type will keep your workflow specific if more activity types are added in the future. For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#merge_group). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+> * {% data reusables.actions.merge-group-event-with-required-checks %}
+
+Runs your workflow when a pull request is added to a merge queue, which adds the pull request to a merge group. For more information see [AUTOTITLE](/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request-with-a-merge-queue).
+
+For example, you can run a workflow when the `checks_requested` activity has occurred.
+
+```yaml
+on:
+  pull_request:
+    branches: [ "main" ]
+  merge_group:
+    types: [checks_requested]
+```
+
+## `milestone`
+
+| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
+| --------------------- | -------------- | ------------ | -------------|
+| [`milestone`](/webhooks-and-events/webhooks/webhook-events-and-payloads#milestone) | - `created`<br/>- `closed`<br/>- `opened`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
+
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#milestone). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when a milestone in the workflow's repository is created or modified. For more information about milestones, see [AUTOTITLE](/issues/using-labels-and-milestones-to-track-work/about-milestones). For information about the milestone APIs, see [AUTOTITLE](/graphql/reference/objects#milestone) in the GraphQL API documentation or [AUTOTITLE](/rest/issues/milestones).
+
+If you want to run your workflow when an issue is added to or removed from a milestone, use the `milestoned` or `demilestoned` activity types for the [`issues`](#issues) event instead.
 
 For example, you can run a workflow when a milestone has been `opened` or `deleted`.
 
@@ -412,15 +384,15 @@ on:
     types: [opened, deleted]
 ```
 
-#### `page_build`
-
-Runs your workflow anytime someone pushes to a {% data variables.product.product_name %} Pages-enabled branch, which triggers the `page_build` event. For information about the REST API, see "[Pages](/rest/reference/repos#pages)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `page_build`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`page_build`](/webhooks/event-payloads/#page_build) | n/a | Last commit on default branch | n/a |
+| [`page_build`](/webhooks-and-events/webhooks/webhook-events-and-payloads#page_build) | Not applicable | Last commit on default branch | Default branch |
+
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when someone pushes to a branch that is the publishing source for {% data variables.product.prodname_pages %}, if {% data variables.product.prodname_pages %} is enabled for the repository. For more information about {% data variables.product.prodname_pages %} publishing sources, see [AUTOTITLE](/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site). For information about the REST API, see [AUTOTITLE](/rest/repos#pages).
 
 For example, you can run a workflow when the `page_build` event occurs.
 
@@ -429,17 +401,30 @@ on:
   page_build
 ```
 
-#### `project`
+{% ifversion projects-v1 %}
 
-Runs your workflow anytime the `project` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Projects](/rest/reference/projects)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `project`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`project`](/webhooks/event-payloads/#project) | - `created`<br/>- `updated`<br/>- `closed`<br/>- `reopened`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
+| [`project`](/webhooks-and-events/webhooks/webhook-events-and-payloads#project) | - `created`<br/>- `closed`<br/>- `reopened`<br/>- `edited`<br/>- `deleted`<br/> | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} The `edited` activity type refers to when a {% data variables.projects.projects_v1_board %}, not a column or card on the {% data variables.projects.projects_v1_board %}, is edited. For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#project). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+{% data reusables.actions.branch-requirement %}
+
+> [!NOTE]
+> This event only occurs for projects owned by the workflow's repository, not for organization-owned or user-owned projects or for projects owned by another repository.
+
+{% ifversion fpt or ghec %}
+
+> [!NOTE]
+> This event only occurs for {% data variables.product.prodname_projects_v1 %}.
+
+{% endif %}
+
+Runs your workflow when a {% data variables.projects.projects_v1_board %} is created or modified. For activity related to cards or columns in a {% data variables.projects.projects_v1_board %}, use the [`project_card`](#project_card) or [`project_column`](#project_column) events instead. For more information about {% data variables.projects.projects_v1_boards %}, see [AUTOTITLE](/issues/organizing-your-work-with-project-boards/managing-project-boards/about-project-boards). For information about the {% data variables.projects.projects_v1_board %} APIs, see [AUTOTITLE](/graphql/reference/objects#project) in the GraphQL API documentation or [AUTOTITLE](/rest/projects).
 
 For example, you can run a workflow when a project has been `created` or `deleted`.
 
@@ -449,37 +434,59 @@ on:
     types: [created, deleted]
 ```
 
-#### `project_card`
-
-Runs your workflow anytime the `project_card` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Project cards](/rest/reference/projects#cards)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `project_card`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`project_card`](/webhooks/event-payloads/#project_card) | - `created`<br/>- `moved`<br/>- `converted` to an issue<br/>- `edited`<br/>- `deleted` | Last commit on default branch | Default branch |
+| [`project_card`](/webhooks-and-events/webhooks/webhook-events-and-payloads#project_card) | - `created`<br/>- `moved`<br/>- `converted` to an issue<br/>- `edited`<br/>- `deleted` | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#project_card). {% data reusables.developer-site.limit_workflow_to_activity_types %}
 
-For example, you can run a workflow when a project card has been `opened` or `deleted`.
+{% data reusables.actions.branch-requirement %}
+
+> [!NOTE]
+> This event only occurs for projects owned by the workflow's repository, not for organization-owned or user-owned projects or for projects owned by another repository.
+
+{% ifversion fpt or ghec %}
+
+> [!NOTE]
+> This event only occurs for {% data variables.product.prodname_projects_v1 %}.
+
+{% endif %}
+
+Runs your workflow when a card on a {% data variables.projects.projects_v1_board %} is created or modified. For activity related to {% data variables.projects.projects_v1_boards %} or columns in a {% data variables.projects.projects_v1_board %}, use the [`project`](#project) or [`project_column`](#project_column) event instead. For more information about {% data variables.projects.projects_v1_boards %}, see [AUTOTITLE](/issues/organizing-your-work-with-project-boards/managing-project-boards/about-project-boards). For information about the project card APIs, see [AUTOTITLE](/graphql/reference/objects#projectcard) in the GraphQL API documentation or [AUTOTITLE](/rest/projects/cards).
+
+For example, you can run a workflow when a project card has been `created` or `deleted`.
 
 ```yaml
 on:
   project_card:
-    types: [opened, deleted]
+    types: [created, deleted]
 ```
 
-#### `project_column`
-
-Runs your workflow anytime the `project_column` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Project columns](/rest/reference/projects#columns)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `project_column`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`project_column`](/webhooks/event-payloads/#project_column) | - `created`<br/>- `updated`<br/>- `moved`<br/>- `deleted` | Last commit on default branch | Default branch |
+| [`project_column`](/webhooks-and-events/webhooks/webhook-events-and-payloads#project_column) | - `created`<br/>- `updated`<br/>- `moved`<br/>- `deleted` | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#project_column). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+{% data reusables.actions.branch-requirement %}
+
+> [!NOTE]
+> This event only occurs for projects owned by the workflow's repository, not for organization-owned or user-owned projects or for projects owned by another repository.
+
+{% ifversion fpt or ghec %}
+
+> [!NOTE]
+> This event only occurs for {% data variables.product.prodname_projects_v1 %}.
+
+{% endif %}
+
+Runs your workflow when a column on a {% data variables.projects.projects_v1_board %} is created or modified. For activity related to {% data variables.projects.projects_v1_boards %} or cards in a {% data variables.projects.projects_v1_board %}, use the [`project`](#project) or [`project_card`](#project_card) event instead. For more information about {% data variables.projects.projects_v1_boards %}, see [AUTOTITLE](/issues/organizing-your-work-with-project-boards/managing-project-boards/about-project-boards). For information about the project column APIs, see [AUTOTITLE](/graphql/reference/objects#projectcolumn) in the GraphQL API documentation or [AUTOTITLE](/rest/projects#columns).
 
 For example, you can run a workflow when a project column has been `created` or `deleted`.
 
@@ -489,15 +496,17 @@ on:
     types: [created, deleted]
 ```
 
-#### `public`
+{% endif %}
 
-Runs your workflow anytime someone makes a private repository public, which triggers the `public` event. For information about the REST API, see "[Edit repositories](/rest/reference/repos#edit)."
-
-{% data reusables.github-actions.branch-requirement %}
+## `public`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`public`](/webhooks/event-payloads/#public) | n/a | Last commit on default branch |  Default branch |
+| [`public`](/webhooks-and-events/webhooks/webhook-events-and-payloads#public) | Not applicable | Last commit on default branch |  Default branch |
+
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when your workflow's repository changes from private to public. For information about the REST API, see [AUTOTITLE](/rest/repos#edit).
 
 For example, you can run a workflow when the `public` event occurs.
 
@@ -506,41 +515,151 @@ on:
   public
 ```
 
-#### `pull_request`
-
-Runs your workflow anytime the `pull_request` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Pull requests](/rest/reference/pulls)."
-
-{% note %}
-
-**Note:** By default, a workflow only runs when a `pull_request`'s activity type is `opened`, `synchronize`, or `reopened`. To trigger workflows for more activity types, use the `types` keyword.
-
-{% endnote %}
+## `pull_request`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`pull_request`](/webhooks/event-payloads/#pull_request) | - `assigned`<br/>- `unassigned`<br/>- `labeled`<br/>- `unlabeled`<br/>- `opened`<br/>- `edited`<br/>- `closed`<br/>- `reopened`<br/>- `synchronize`<br/>- `ready_for_review`<br/>- `locked`<br/>- `unlocked` <br/>- `review_requested` <br/>- `review_request_removed` | Last merge commit on the `GITHUB_REF` branch | PR merge branch `refs/pull/:prNumber/merge` |
+| [`pull_request`](/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request) | - `assigned`<br/>- `unassigned`<br/>- `labeled`<br/>- `unlabeled`<br/>- `opened`<br/>- `edited`<br/>- `closed`<br/>- `reopened`<br/>- `synchronize`<br/>- `converted_to_draft`<br/>- `locked`<br/>- `unlocked`<br/>{% ifversion fpt or ghec %}- `enqueued`<br/>- `dequeued`<br/>{% endif %}- `milestoned`<br/>- `demilestoned`<br/>- `ready_for_review`<br/>- `review_requested`<br/>- `review_request_removed`<br/>- `auto_merge_enabled`<br/>- `auto_merge_disabled` | Last merge commit on the `GITHUB_REF` branch | PR merge branch `refs/pull/PULL_REQUEST_NUMBER/merge` |
 
-You extend or limit the default activity types using the `types` keyword. For more information, see "[Workflow syntax for {% data variables.product.prodname_actions %}](/articles/workflow-syntax-for-github-actions#onevent_nametypes)."
+> [!NOTE]
+> * {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request). By default, a workflow only runs when a `pull_request` event's activity type is `opened`, `synchronize`, or `reopened`. To trigger workflows by different activity types, use the `types` keyword. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onevent_nametypes).
+> * Workflows will not run on `pull_request` activity if the pull request has a merge conflict. The merge conflict must be resolved first.
+>   Conversely, workflows with the `pull_request_target` event will run even if the pull request has a merge conflict. Before using the `pull_request_target` trigger, you should be aware of the security risks. For more information, see [`pull_request_target`](#pull_request_target).
+> * The `pull_request` webhook event payload is empty for merged pull requests and pull requests that come from forked repositories.
+> * The value of `GITHUB_REF` varies for a closed pull request depending on whether the pull request has been merged or not. If a pull request was closed but not merged, it will be `refs/pull/PULL_REQUEST_NUMBER/merge`. If a pull request was closed as a result of being merged, it will be the fully qualified `ref` of the branch it was merged into, for example `/refs/heads/main`.
 
-For example, you can run a workflow when a pull request has been `assigned`, `opened`, `synchronize`, or `reopened`.
+Runs your workflow when activity on a pull request in the workflow's repository occurs. For example, if no activity types are specified, the workflow runs when a pull request is opened or reopened or when the head branch of the pull request is updated. For activity related to pull request reviews, pull request review comments, or pull request comments, use the [`pull_request_review`](#pull_request_review), [`pull_request_review_comment`](#pull_request_review_comment), or [`issue_comment`](#issue_comment) events instead. For information about the pull request APIs, see [AUTOTITLE](/graphql/reference/objects#pullrequest) in the GraphQL API documentation or [AUTOTITLE](/rest/pulls).
+
+Note that `GITHUB_SHA` for this event is the last merge commit of the pull request merge branch. If you want to get the commit ID for the last commit to the head branch of the pull request, use `github.event.pull_request.head.sha` instead.
+
+For example, you can run a workflow when a pull request has been opened or reopened.
 
 ```yaml
 on:
   pull_request:
-    types: [assigned, opened, synchronize, reopened]
+    types: [opened, reopened]
+```
+
+You can use the event context to further control when jobs in your workflow will run. For example, this workflow will run when a review is requested on a pull request, but the `specific_review_requested` job will only run when a review by `octo-team` is requested.
+
+```yaml
+on:
+  pull_request:
+    types: [review_requested]
+jobs:
+  specific_review_requested:
+    runs-on: ubuntu-latest
+    if: {% raw %}${{ github.event.requested_team.name == 'octo-team'}}{% endraw %}
+    steps:
+      - run: echo 'A review from octo-team was requested'
+```
+
+### Running your `pull_request` workflow based on the head or base branch of a pull request
+
+You can use the `branches` or `branches-ignore` filter to configure your workflow to only run on pull requests that target specific branches. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onpull_requestpull_request_targetbranchesbranches-ignore).
+
+For example, this workflow will run when someone opens a pull request that targets a branch whose name starts with `releases/`:
+
+```yaml
+on:
+  pull_request:
+    types:
+      - opened
+    branches:
+      - 'releases/**'
+```
+
+> [!NOTE]
+> {% data reusables.actions.branch-paths-filter %} For example, the following workflow will only run when a pull request that includes a change to a JavaScript (`.js`) file is opened on a branch whose name starts with `releases/`:
+>
+> ```yaml
+> on:
+>   pull_request:
+>     types:
+>       - opened
+>     branches:
+>       - 'releases/**'
+>     paths:
+>       - '**.js'
+> ```
+
+To run a job based on the pull request's head branch name (as opposed to the pull request's base branch name), use the `github.head_ref` context in a conditional. For example, this workflow will run whenever a pull request is opened, but the `run_if` job will only execute if the head of the pull request is a branch whose name starts with `releases/`:
+
+```yaml
+on:
+  pull_request:
+    types:
+      - opened
+jobs:
+  run_if:
+    if: startsWith(github.head_ref, 'releases/')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "The head of this PR starts with 'releases/'"
+```
+
+### Running your `pull_request` workflow based on files changed in a pull request
+
+You can also configure your workflow to run when a pull request changes specific files. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onpushpull_requestpull_request_targetpathspaths-ignore).
+
+For example, this workflow will run when a pull request includes a change to a JavaScript file (`.js`):
+
+```yaml
+on:
+  pull_request:
+    paths:
+      - '**.js'
+```
+
+> [!NOTE]
+> {% data reusables.actions.branch-paths-filter %} For example, the following workflow will only run when a pull request that includes a change to a JavaScript (`.js`) file is opened on a branch whose name starts with `releases/`:
+>
+> ```yaml
+> on:
+>   pull_request:
+>     types:
+>       - opened
+>     branches:
+>       - 'releases/**'
+>     paths:
+>       - '**.js'
+> ```
+
+### Running your `pull_request` workflow when a pull request merges
+
+When a pull request merges, the pull request is automatically closed. To run a workflow when a pull request merges, use the `pull_request` `closed` event type along with a conditional that checks the `merged` value of the event. For example, the following workflow will run whenever a pull request closes. The `if_merged` job will only run if the pull request was also merged.
+
+```yaml
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  if_merged:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        echo The PR was merged
 ```
 
 {% data reusables.developer-site.pull_request_forked_repos_link %}
 
-#### `pull_request_review`
+## `pull_request_comment` (use `issue_comment`)
 
-Runs your workflow anytime the `pull_request_review` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Pull request reviews](/rest/reference/pulls#reviews)."
+To run your workflow when a comment on a pull request (not on a pull request's diff) is created, edited, or deleted, use the [`issue_comment`](#issue_comment) event. For activity related to pull request reviews or pull request review comments, use the [`pull_request_review`](#pull_request_review) or [`pull_request_review_comment`](#pull_request_review_comment) events.
+
+## `pull_request_review`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`pull_request_review`](/webhooks/event-payloads/#pull_request_review) | - `submitted`<br/>- `edited`<br/>- `dismissed` | Last merge commit on the `GITHUB_REF` branch | PR merge branch `refs/pull/:prNumber/merge` |
+| [`pull_request_review`](/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review) | - `submitted`<br/>- `edited`<br/>- `dismissed` | Last merge commit on the `GITHUB_REF` branch | PR merge branch `refs/pull/PULL_REQUEST_NUMBER/merge` |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+Runs your workflow when a pull request review is submitted, edited, or dismissed. A pull request review is a group of pull request review comments in addition to a body comment and a state. For activity related to pull request review comments or pull request comments, use the [`pull_request_review_comment`](#pull_request_review_comment) or [`issue_comment`](#issue_comment) events instead. For information about the pull request review APIs, see [AUTOTITLE](/graphql/reference/objects#pullrequest) in the GraphQL API documentation or [AUTOTITLE](/rest/pulls#reviews).
 
 For example, you can run a workflow when a pull request review has been `edited` or `dismissed`.
 
@@ -550,17 +669,35 @@ on:
     types: [edited, dismissed]
 ```
 
+### Running a workflow when a pull request is approved
+
+To run your workflow when a pull request has been approved, you can trigger your workflow with the `submitted` type of `pull_request_review` event, then check the review state with the `github.event.review.state` property. For example, this workflow will run whenever a pull request review is submitted, but the `approved` job will only run if the submitted review is an approving review:
+
+```yaml
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  approved:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "This PR was approved"
+```
+
 {% data reusables.developer-site.pull_request_forked_repos_link %}
 
-#### `pull_request_review_comment`
-
-Runs your workflow anytime a comment on a pull request's unified diff is modified, which triggers the `pull_request_review_comment` event. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see [Review comments](/rest/reference/pulls#comments).
+## `pull_request_review_comment`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`pull_request_review_comment`](/webhooks/event-payloads/#pull_request_review_comment) | - `created`<br/>- `edited`<br/>- `deleted`| Last merge commit on the `GITHUB_REF` branch | PR merge branch `refs/pull/:prNumber/merge` |
+| [`pull_request_review_comment`](/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review_comment) | - `created`<br/>- `edited`<br/>- `deleted`| Last merge commit on the `GITHUB_REF` branch | PR merge branch `refs/pull/PULL_REQUEST_NUMBER/merge` |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request_review_comment). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+Runs your workflow when a pull request review comment is modified. A pull request review comment is a comment on a pull request's diff. For activity related to pull request reviews or pull request comments, use the [`pull_request_review`](#pull_request_review) or [`issue_comment`](#issue_comment) events instead. For information about the pull request review comment APIs, see [AUTOTITLE](/graphql/reference/objects#pullrequestreviewcomment) in the GraphQL API documentation or [AUTOTITLE](/rest/pulls#comments).
 
 For example, you can run a workflow when a pull request review comment has been `created` or `deleted`.
 
@@ -572,40 +709,134 @@ on:
 
 {% data reusables.developer-site.pull_request_forked_repos_link %}
 
-{% if currentVersion == "free-pro-team@latest" or currentVersion ver_gt "enterprise-server@2.22" %}
-
-#### `pull_request_target`
-
-This event is similar to `pull_request`, except that it runs in the context of the base repository of the pull request, rather than in the merge commit. This means that you can more safely make your secrets available to the workflows triggered by the pull request, because only workflows defined in the commit on the base repository are run. For example, this event allows you to create workflows that label and comment on pull requests, based on the contents of the event payload. 
+## `pull_request_target`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`pull_request`](/webhooks/event-payloads/#pull_request) | - `assigned`<br/>- `unassigned`<br/>- `labeled`<br/>- `unlabeled`<br/>- `opened`<br/>- `edited`<br/>- `closed`<br/>- `reopened`<br/>- `synchronize`<br/>- `ready_for_review`<br/>- `locked`<br/>- `unlocked` <br/>- `review_requested` <br/>- `review_request_removed` | Last commit on the PR base branch | PR base branch |
+| [`pull_request`](/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request) | - `assigned`<br/>- `unassigned`<br/>- `labeled`<br/>- `unlabeled`<br/>- `opened`<br/>- `edited`<br/>- `closed`<br/>- `reopened`<br/>- `synchronize`<br/>- `converted_to_draft`<br/>- `ready_for_review`<br/>- `locked`<br/>- `unlocked` <br/>{% ifversion fpt or ghec %}- `enqueued`<br/>- `dequeued`<br/>{% endif %}- `review_requested` <br/>- `review_request_removed` <br/>- `auto_merge_enabled` <br/>- `auto_merge_disabled` | Last commit on the PR base branch | PR base branch |
 
-By default, a workflow only runs when a `pull_request_target`'s activity type is `opened`, `synchronize`, or `reopened`. To trigger workflows for more activity types, use the `types` keyword. For more information, see "[Workflow syntax for {% data variables.product.prodname_actions %}](/articles/workflow-syntax-for-github-actions#onevent_nametypes)."
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request). By default, a workflow only runs when a `pull_request_target` event's activity type is `opened`, `synchronize`, or `reopened`. To trigger workflows by different activity types, use the `types` keyword. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onevent_nametypes).
+
+Runs your workflow when activity on a pull request in the workflow's repository occurs. For example, if no activity types are specified, the workflow runs when a pull request is opened or reopened or when the head branch of the pull request is updated.
+
+This event runs in the context of the base of the pull request, rather than in the context of the merge commit, as the `pull_request` event does. This prevents execution of unsafe code from the head of the pull request that could alter your repository or steal any secrets you use in your workflow. This event allows your workflow to do things like label or comment on pull requests from forks. Avoid using this event if you need to build or run code from the pull request.
+
+To ensure repository security, branches with names that match certain patterns (such as those which look similar to SHAs) may not trigger workflows with the `pull_request_target` event.
+
+{% data reusables.actions.pull-request-target-permissions-warning %}
 
 For example, you can run a workflow when a pull request has been `assigned`, `opened`, `synchronize`, or `reopened`.
 
 ```yaml
-on: pull_request_target
+on:
+  pull_request_target:
     types: [assigned, opened, synchronize, reopened]
 ```
 
-{% endif %}
+### Running your `pull_request_target` workflow based on the head or base branch of a pull request
 
-#### `push`
+You can use the `branches` or `branches-ignore` filter to configure your workflow to only run on pull requests that target specific branches. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onpull_requestpull_request_targetbranchesbranches-ignore).
 
-{% note %}
+For example, this workflow will run when someone opens a pull request that targets a branch whose name starts with `releases/`:
 
-**Note:** The webhook payload available to GitHub Actions does not include the `added`, `removed`, and `modified` attributes in the `commit` object. You can retrieve the full commit object using the REST API. For more information, see "[Get a single commit](/rest/reference/repos#get-a-single-commit)"".
+```yaml
+on:
+  pull_request_target:
+    types:
+      - opened
+    branches:
+      - 'releases/**'
+```
 
-{% endnote %}
+> [!NOTE]
+> {% data reusables.actions.branch-paths-filter %} For example, the following workflow will only run when a pull request that includes a change to a JavaScript (`.js`) file is opened on a branch whose name starts with `releases/`:
+>
+> ```yaml
+> on:
+>   pull_request_target:
+>     types:
+>       - opened
+>     branches:
+>       - 'releases/**'
+>     paths:
+>       - '**.js'
+> ```
 
-Runs your workflow when someone pushes to a repository branch, which triggers the `push` event.
+To run a job based on the pull request's head branch name (as opposed to the pull request's base branch name), use the `github.head_ref` context in a conditional. For example, this workflow will run whenever a pull request is opened, but the `run_if` job will only execute if the head of the pull request is a branch whose name starts with `releases/`:
+
+```yaml
+on:
+  pull_request_target:
+    types:
+      - opened
+jobs:
+  run_if:
+    if: startsWith(github.head_ref, 'releases/')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "The head of this PR starts with 'releases/'"
+```
+
+### Running your `pull_request_target` workflow based on files changed in a pull request
+
+You can use the `paths` or `paths-ignore` filter to configure your workflow to run when a pull request changes specific files. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onpushpull_requestpull_request_targetpathspaths-ignore).
+
+For example, this workflow will run when a pull request includes a change to a JavaScript file (`.js`):
+
+```yaml
+on:
+  pull_request_target:
+    paths:
+      - '**.js'
+```
+
+> [!NOTE]
+> {% data reusables.actions.branch-paths-filter %} For example, the following workflow will only run when a pull request that includes a change to a JavaScript (`.js`) file is opened on a branch whose name starts with `releases/`:
+>
+> ```yaml
+> on:
+>   pull_request_target:
+>     types:
+>       - opened
+>     branches:
+>       - 'releases/**'
+>     paths:
+>       - '**.js'
+> ```
+
+### Running your `pull_request_target` workflow when a pull request merges
+
+When a pull request merges, the pull request is automatically closed. To run a workflow when a pull request merges, use the `pull_request_target` `closed` event type along with a conditional that checks the `merged` value of the event. For example, the following workflow will run whenever a pull request closes. The `if_merged` job will only run if the pull request was also merged.
+
+```yaml
+on:
+  pull_request_target:
+    types:
+      - closed
+
+jobs:
+  if_merged:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        echo The PR was merged
+```
+
+## `push`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`push`](/webhooks/event-payloads/#push) | n/a | Commit pushed, unless deleting a branch (when it's the default branch) | Updated ref |
+| [`push`](/webhooks-and-events/webhooks/webhook-events-and-payloads#push) | Not applicable | Tip commit pushed to the ref. When you delete a branch, the SHA in the workflow run (and its associated refs) reverts to the default branch of the repository. | Updated ref |
+
+> [!NOTE]
+> The webhook payload available to GitHub Actions does not include the `added`, `removed`, and `modified` attributes in the `commit` object. You can retrieve the full commit object using the API. For information, see [AUTOTITLE](/graphql/reference/objects#commit) in the GraphQL API documentation or [AUTOTITLE](/rest/commits#get-a-commit).
+
+> [!NOTE]
+> {% ifversion fpt or ghec or ghes > 3.14 %}Events will not be created if more than 5,000 branches are pushed at once. {% endif %}Events will not be created for tags when more than three tags are pushed at once.
+
+Runs your workflow when you push a commit or tag, or when you create a repository from a template.
 
 For example, you can run a workflow when the `push` event occurs.
 
@@ -614,17 +845,84 @@ on:
   push
 ```
 
-#### `registry_package`
+> [!NOTE]
+> When a `push` webhook event triggers a workflow run, the Actions UI's "pushed by" field shows the account of the pusher and not the author or committer. However, if the changes are pushed to a repository using SSH authentication with a deploy key, then the "pushed by" field will be the repository admin who verified the deploy key when it was added it to a repository.
 
-Runs your workflow anytime a package is `published` or `updated`. For more information, see "[Managing packages with {% data variables.product.prodname_registry %}](/github/managing-packages-with-github-packages)."
+### Running your workflow only when a push to specific branches occurs
+
+You can use the `branches` or `branches-ignore` filter to configure your workflow to only run when specific branches are pushed. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onpushbranchestagsbranches-ignoretags-ignore).
+
+For example, this workflow will run when someone pushes to `main` or to a branch that starts with `releases/`.
+
+```yaml
+on:
+  push:
+    branches:
+      - 'main'
+      - 'releases/**'
+```
+
+> [!NOTE]
+> {% data reusables.actions.branch-paths-filter %} For example, the following workflow will only run when a push that includes a change to a JavaScript (`.js`) file is made to a branch whose name starts with `releases/`:
+>
+> ```yaml
+> on:
+>   push:
+>     branches:
+>       - 'releases/**'
+>     paths:
+>       - '**.js'
+> ```
+
+### Running your workflow only when a push of specific tags occurs
+
+You can use the `tags` or `tags-ignore` filter to configure your workflow to only run when specific tags are pushed. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onpushbranchestagsbranches-ignoretags-ignore).
+
+For example, this workflow will run when someone pushes a tag that starts with `v1.`.
+
+```yaml
+on:
+  push:
+    tags:
+      - v1.**
+```
+
+### Running your workflow only when a push affects specific files
+
+You can use the `paths` or `paths-ignore` filter to configure your workflow to run when a push to specific files occurs. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onpushpull_requestpull_request_targetpathspaths-ignore).
+
+For example, this workflow will run when someone pushes a change to a JavaScript file (`.js`):
+
+```yaml
+on:
+  push:
+    paths:
+      - '**.js'
+```
+
+## `registry_package`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`registry_package`](/webhooks/event-payloads/#package) | - `published`<br/>- `updated` | Commit of the published package | Branch or tag of the published package |
+| [`registry_package`](/webhooks-and-events/webhooks/webhook-events-and-payloads#package) | - `published`<br/>- `updated` | Commit of the published package | Branch or tag of the published package |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#registry_package). {% data reusables.developer-site.limit_workflow_to_activity_types %}
 
-For example, you can run a workflow when a package has been `published`.
+{% data reusables.actions.branch-requirement %}
+
+> [!NOTE]
+> When pushing multi-architecture container images, this event occurs once per manifest, so you might observe your workflow triggering multiple times. To mitigate this, and only run your workflow job for the event that contains the actual image tag information, use a conditional:
+>
+> ```yaml
+> jobs:
+>     job_name:
+>         if: ${{ github.event.registry_package.package_version.container_metadata.tag.name != '' }}
+> ```
+
+Runs your workflow when activity related to {% data variables.product.prodname_registry %} occurs in your repository. For more information, see [{% data variables.product.prodname_registry %} Documentation](/packages).
+
+For example, you can run a workflow when a new package version has been `published`.
 
 ```yaml
 on:
@@ -632,21 +930,22 @@ on:
     types: [published]
 ```
 
-#### `release`
-
-{% note %}
-
-**Note:** The `release` event is not triggered for draft releases.
-
-{% endnote %}
-
-Runs your workflow anytime the `release` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Releases](/rest/reference/repos#releases)."
+## `release`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`release`](/webhooks/event-payloads/#release) | - `published` <br/>- `unpublished` <br/>- `created` <br/>- `edited` <br/>- `deleted` <br/>- `prereleased`<br/> - `released` | Last commit in the tagged release | Tag of release |
+| [`release`](/webhooks-and-events/webhooks/webhook-events-and-payloads#release) | - `published` <br/>- `unpublished` <br/>- `created` <br/>- `edited` <br/>- `deleted` <br/>- `prereleased`<br/> - `released` | Last commit in the tagged release | Tag ref of release `refs/tags/<tag_name>` |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#release). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+> [!NOTE]
+> Workflows are not triggered for the `created`, `edited`, or `deleted` activity types for draft releases. When you create your release through the {% data variables.product.github %} UI, your release may automatically be saved as a draft.
+
+> [!NOTE]
+> The `prereleased` type will not trigger for pre-releases published from draft releases, but the `published` type will trigger. If you want a workflow to run when stable _and_ pre-releases publish, subscribe to `published` instead of `released` and `prereleased`.
+
+Runs your workflow when release activity in your repository occurs. For information about the release APIs, see [AUTOTITLE](/graphql/reference/objects#release) in the GraphQL API documentation or [AUTOTITLE](/rest/releases) in the REST API documentation.
 
 For example, you can run a workflow when a release has been `published`.
 
@@ -656,15 +955,126 @@ on:
     types: [published]
 ```
 
-#### `status`
+## `repository_dispatch`
 
-Runs your workflow anytime the status of a Git commit changes, which triggers the `status` event. For information about the REST API, see [Statuses](/rest/reference/repos#statuses).
+| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
+| ------------------ | ------------ | ------------ | ------------------|
+| [repository_dispatch](/webhooks-and-events/webhooks/webhook-events-and-payloads#repository_dispatch) | Custom | Last commit on default branch | Default branch |
 
-{% data reusables.github-actions.branch-requirement %}
+{% data reusables.actions.branch-requirement %}
+
+You can use the {% data variables.product.github %} API to trigger a webhook event called [`repository_dispatch`](/webhooks-and-events/webhooks/webhook-events-and-payloads#repository_dispatch) when you want to trigger a workflow for activity that happens outside of {% data variables.product.github %}. For more information, see [AUTOTITLE](/rest/repos/repos#create-a-repository-dispatch-event).
+
+When you make a request to create a `repository_dispatch` event, you must specify an `event_type` to describe the activity type. By default, all `repository_dispatch` activity types trigger a workflow to run. You can use the `types` keyword to limit your workflow to run when a specific `event_type` value is sent in the `repository_dispatch` webhook payload.
+
+```yaml
+on:
+  repository_dispatch:
+    types: [test_result]
+```
+
+> [!NOTE]
+> The `event_type` value is limited to 100 characters.
+
+Any data that you send through the `client_payload` parameter will be available in the `github.event` context in your workflow. For example, if you send this request body when you create a repository dispatch event:
+
+```json
+{
+  "event_type": "test_result",
+  "client_payload": {
+    "passed": false,
+    "message": "Error: timeout"
+  }
+}
+```
+
+then you can access the payload in a workflow like this:
+
+```yaml
+on:
+  repository_dispatch:
+    types: [test_result]
+
+jobs:
+  run_if_failure:
+    if: {% raw %}${{ !github.event.client_payload.passed }}{% endraw %}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          MESSAGE: {% raw %}${{ github.event.client_payload.message }}{% endraw %}
+        run: echo $MESSAGE
+```
+
+> [!NOTE]
+> * The maximum number of top-level properties in `client_payload` is 10.
+> * The payload can contain a maximum of 65,535 characters.
+
+## `schedule`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`status`](/webhooks/event-payloads/#status) | n/a | Last commit on default branch | n/a |
+| Not applicable | Not applicable | Last commit on default branch | Default branch | When the scheduled workflow is set to run. A scheduled workflow uses [POSIX cron syntax](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07). For more information, see [AUTOTITLE](/actions/using-workflows#triggering-a-workflow-with-events). |
+
+> [!NOTE]
+> * {% data reusables.actions.schedule-delay %}
+> * This event will only trigger a workflow run if the workflow file is on the default branch.
+> * Scheduled workflows will only run on the default branch.
+> * In a public repository, scheduled workflows are automatically disabled when no repository activity has occurred in 60 days. For information on re-enabling a disabled workflow, see [AUTOTITLE](/enterprise-server/actions/using-workflows/disabling-and-enabling-a-workflow#enabling-a-workflow).
+> * For an enterprise with {% data variables.product.prodname_emus %}, scheduled workflows will not run if the last `actor` associated with the scheduled workflow has been deprovisioned (and therefore become suspended) by the {% data variables.product.prodname_emu %} identity provider (IdP). However, if the last `actor` {% data variables.product.prodname_emu %} has not been deprovisioned by the IdP, and has only been removed as a member from a given organization in the enterprise, scheduled workflows will still run with that user set as the `actor`. Similarly, for an enterprise without {% data variables.product.prodname_emus %}, removing a user from an organization will not prevent scheduled workflows which had that user as their `actor` from running. Essentially, triggering a scheduled workflow requires that the status of the `actor` user account associated with the workflow is currently active (i.e. not suspended or deleted). Thus, the _user account's_ status, in both {% data variables.product.prodname_emu %} and non-{% data variables.product.prodname_emu %} scenarios, is what's important, _not_ the user's _membership status_ in the organization where the scheduled workflow is located.
+> * Certain repository events change the `actor` associated with the workflow. For example, a user who changes the default branch of the repository, which changes the branch on which scheduled workflows run, becomes `actor` for those scheduled workflows.
+> * For a deactivated scheduled workflow, if a user with `write` permissions to the repository makes a commit that changes the `cron` schedule on the workflow, the workflow will be reactivated, and that user will become the `actor` associated with any workflow runs. Note that, in this situation, the workflow is not reactivated by any change to the workflow file; you must alter the `cron` value in the workflow and commit this change.
+>
+>   **Example:**
+>
+>   ```yaml
+>   on:
+>     schedule:
+>       - cron: "15 4,5 * * *"   # <=== Change this value
+>   ```
+
+The `schedule` event allows you to trigger a workflow at a scheduled time.
+
+{% data reusables.repositories.actions-scheduled-workflow-example %}
+
+Cron syntax has five fields separated by a space, and each field represents a unit of time.
+
+```text
+┌───────────── minute (0 - 59)
+│ ┌───────────── hour (0 - 23)
+│ │ ┌───────────── day of the month (1 - 31)
+│ │ │ ┌───────────── month (1 - 12 or JAN-DEC)
+│ │ │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
+│ │ │ │ │
+│ │ │ │ │
+│ │ │ │ │
+* * * * *
+```
+
+You can use these operators in any of the five fields:
+
+| Operator | Description | Example |
+| -------- | ----------- | ------- |
+| * | Any value | `15 * * * *` runs at every minute 15 of every hour of every day. |
+| , | Value list separator | `2,10 4,5 * * *` runs at minute 2 and 10 of the 4th and 5th hour of every day. |
+| - | Range of values | `30 4-6 * * *` runs at minute 30 of the 4th, 5th, and 6th hour. |
+| / | Step values | `20/15 * * * *` runs every 15 minutes starting from minute 20 through 59 (minutes 20, 35, and 50). |
+
+> [!NOTE]
+> {% data variables.product.prodname_actions %} does not support the non-standard syntax `@yearly`, `@monthly`, `@weekly`, `@daily`, `@hourly`, and `@reboot`.
+
+You can use [crontab guru](https://crontab.guru/) to help generate your cron syntax and confirm what time it will run. To help you get started, there is also a list of [crontab guru examples](https://crontab.guru/examples.html).
+
+Notifications for scheduled workflows are sent to the user who last modified the cron syntax in the workflow file. For more information, see [AUTOTITLE](/actions/monitoring-and-troubleshooting-workflows/notifications-for-workflow-runs).
+
+## `status`
+
+| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
+| --------------------- | -------------- | ------------ | -------------|
+| [`status`](/webhooks-and-events/webhooks/webhook-events-and-payloads#status) | Not applicable | Last commit on default branch | Default branch |
+
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when the status of a Git commit changes. For example, commits can be marked as `error`, `failure`, `pending`, or `success`. If you want to provide more details about the status change, you may want to use the [`check_run`](#check_run) event. For information about the commit status APIs, see [AUTOTITLE](/graphql/reference/objects#status) in the GraphQL API documentation or [AUTOTITLE](/rest/commits#commit-statuses).
 
 For example, you can run a workflow when the `status` event occurs.
 
@@ -673,19 +1083,38 @@ on:
   status
 ```
 
-#### `watch`
+If you want to run a job in your workflow based on the new commit state, you can use the `github.event.state` context. For example, the following workflow triggers when a commit status changes, but the `if_error_or_failure` job only runs if the new commit state is `error` or `failure`.
 
-Runs your workflow anytime the `watch` event occurs. {% data reusables.developer-site.multiple_activity_types %} For information about the REST API, see "[Starring](/rest/reference/activity#starring)."
+```yaml
+on:
+  status
+jobs:
+  if_error_or_failure:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.state == 'error' ||
+      github.event.state == 'failure'
+    steps:
+      - env:
+          DESCRIPTION: {% raw %}${{ github.event.description }}{% endraw %}
+        run: |
+          echo The status is error or failed: $DESCRIPTION
+```
 
-{% data reusables.github-actions.branch-requirement %}
+## `watch`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
 | --------------------- | -------------- | ------------ | -------------|
-| [`watch`](/webhooks/event-payloads/#watch) | - `started` | Last commit on default branch | Default branch |
+| [`watch`](/webhooks-and-events/webhooks/webhook-events-and-payloads#watch) | - `started` | Last commit on default branch | Default branch |
 
-{% data reusables.developer-site.limit_workflow_to_activity_types %}
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} Although only the `started` activity type is supported, specifying the activity type will keep your workflow specific if more activity types are added in the future. For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#watch). {% data reusables.developer-site.limit_workflow_to_activity_types %}
 
-For example, you can run a workflow when someone stars a repository, which is the `started` activity type that triggers the watch event.
+{% data reusables.actions.branch-requirement %}
+
+Runs your workflow when the workflow's repository is starred. For information about the pull request APIs, see [AUTOTITLE](/graphql/reference/mutations#addstar) in the GraphQL API documentation or [AUTOTITLE](/rest/activity/starring).
+
+For example, you can run a workflow when someone stars a repository, which is the `started` activity type for a watch event.
 
 ```yaml
 on:
@@ -693,34 +1122,247 @@ on:
     types: [started]
 ```
 
-{% if currentVersion == "free-pro-team@latest" or currentVersion ver_gt "enterprise-server@2.22" %}
-
-#### `workflow_run`
-
-{% data reusables.webhooks.workflow_run_desc %}
+## `workflow_call`
 
 | Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
-| --------------------- | -------------- | ------------ | -------------|	
-| [`workflow_run`](/webhooks/event-payloads/#workflow_run) | - n/a | Last commit on default branch | Default branch |	
+| ------------------ | ------------ | ------------ | ------------------|
+| Same as the caller workflow | Not applicable | Same as the caller workflow | Same as the caller workflow |
 
-If you need to filter branches from this event, you can use `branches` or `branches-ignore`.
+`workflow_call` is used to indicate that a workflow can be called by another workflow. When a workflow is triggered with the `workflow_call` event, the event payload in the called workflow is the same event payload from the calling workflow. For more information see, [AUTOTITLE](/actions/using-workflows/reusing-workflows).
 
-In this example, a workflow is configured to run after the separate “Run Tests” workflow completes.
+The example below only runs the workflow when it's called from another workflow:
+
+```yaml
+on: workflow_call
+```
+
+## `workflow_dispatch`
+
+| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
+| ------------------ | ------------ | ------------ | ------------------|
+| [workflow_dispatch](/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_dispatch) | Not applicable | Last commit on the `GITHUB_REF` branch or tag | Branch or tag that received dispatch |
+
+{% data reusables.actions.branch-requirement %}
+
+To enable a workflow to be triggered manually, you need to configure the `workflow_dispatch` event. You can manually trigger a workflow run using the {% data variables.product.github %} API, {% data variables.product.prodname_cli %}, or the {% data variables.product.github %} UI. For more information, see [AUTOTITLE](/actions/managing-workflow-runs/manually-running-a-workflow).
+
+```yaml
+on: workflow_dispatch
+```
+
+### Providing inputs
+
+You can configure custom-defined input properties, default input values, and required inputs for the event directly in your workflow. When you trigger the event, you can provide the `ref` and any `inputs`. When the workflow runs, you can access the input values in the `inputs` context. For more information, see [AUTOTITLE](/actions/learn-github-actions/contexts).
+
+{% data reusables.actions.inputs-vs-github-event-inputs %}
+
+This example defines inputs called `logLevel`, `tags`, and `environment`. You pass values for these inputs to the workflow when you run it. This workflow then prints the values to the log, using the `inputs.logLevel`, `inputs.tags`, and `inputs.environment` context properties.
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+        type: choice
+        options:
+        - info
+        - warning
+        - debug
+      tags:
+        description: 'Test scenario tags'
+        required: false
+        type: boolean
+      environment:
+        description: 'Environment to run tests against'
+        type: environment
+        required: true
+
+jobs:
+  log-the-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Log level: $LEVEL"
+          echo "Tags: $TAGS"
+          echo "Environment: $ENVIRONMENT"
+        env:
+          LEVEL: {% raw %}${{ inputs.logLevel }}{% endraw %}
+          TAGS: {% raw %}${{ inputs.tags }}{% endraw %}
+          ENVIRONMENT: {% raw %}${{ inputs.environment }}{% endraw %}
+```
+
+If you run this workflow from a browser you must enter values for the required inputs manually before the workflow will run.
+
+![Screenshot of a list of workflow runs. A dropdown menu, labeled "Run workflow" and expanded to show input fields, is outlined in dark orange.](/assets/images/help/actions/workflow-dispatch-inputs.png)
+
+You can also pass inputs when you run a workflow from a script, or by using {% data variables.product.prodname_cli %}. For example:
+
+```shell
+gh workflow run run-tests.yml -f logLevel=warning -f tags=false -f environment=staging
+```
+
+For more information, see the {% data variables.product.prodname_cli %} information in [AUTOTITLE](/actions/managing-workflow-runs/manually-running-a-workflow).
+
+## `workflow_run`
+
+| Webhook event payload | Activity types | `GITHUB_SHA` | `GITHUB_REF` |
+| --------------------- | -------------- | ------------ | -------------|
+| [`workflow_run`](/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_run) | - `completed`<br/>- `requested`<br/>- `in_progress` | Last commit on default branch | Default branch |
+
+> [!NOTE]
+> {% data reusables.developer-site.multiple_activity_types %} The `requested` activity type does not occur when a workflow is re-run. For information about each activity type, see [AUTOTITLE](/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_run). {% data reusables.developer-site.limit_workflow_to_activity_types %}
+
+{% data reusables.actions.branch-requirement %}
+
+> [!NOTE]
+> You can't use `workflow_run` to chain together more than three levels of workflows. For example, if you attempt to trigger five workflows (named `B` to `F`) to run sequentially after an initial workflow `A` has run (that is: `A` → `B` → `C` → `D` → `E` → `F`), workflows `E` and `F` will not be run.
+
+This event occurs when a workflow run is requested or completed. It allows you to execute a workflow based on execution or completion of another workflow. The workflow started by the `workflow_run` event is able to access secrets and write tokens, even if the previous workflow was not. This is useful in cases where the previous workflow is intentionally not privileged, but you need to take a privileged action in a later workflow.
+
+In this example, a workflow is configured to run after the separate "Run Tests" workflow completes.
 
 ```yaml
 on:
   workflow_run:
-    workflows: ["Run Tests"]
-    branches: [main]
-    types: 
+    workflows: [Run Tests]
+    types:
       - completed
-      - requested
 ```
 
-{% endif %}
+If you specify multiple `workflows` for the `workflow_run` event, only one of the workflows needs to run. For example, a workflow with the following trigger will run whenever the "Staging" workflow or the "Lab" workflow completes.
 
-### Triggering new workflows using a personal access token
+```yaml
+on:
+  workflow_run:
+    workflows: [Staging, Lab]
+    types:
+      - completed
+```
 
-{% data reusables.github-actions.actions-do-not-trigger-workflows %} For more information, see "[Authenticating with the GITHUB_TOKEN](/actions/configuring-and-managing-workflows/authenticating-with-the-github_token)."
+### Running a workflow based on the conclusion of another workflow
 
-If you would like to trigger a workflow from a workflow run, you can trigger the event using a personal access token. You'll need to create a personal access token and store it as a secret. To minimize your {% data variables.product.prodname_actions %} usage costs, ensure that you don't create recursive or unintended workflow runs. For more information, see "[Creating and storing encrypted secrets](/actions/configuring-and-managing-workflows/creating-and-storing-encrypted-secrets)."
+A workflow run is triggered regardless of the conclusion of the previous workflow. If you want to run a job or step based on the result of the triggering workflow, you can use a conditional with the `github.event.workflow_run.conclusion` property. For example, this workflow will run whenever a workflow named "Build" completes, but the `on-success` job will only run if the "Build" workflow succeeded, and the `on-failure` job will only run if the "Build" workflow failed:
+
+```yaml
+on:
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+
+jobs:
+  on-success:
+    runs-on: ubuntu-latest
+    if: {% raw %}${{ github.event.workflow_run.conclusion == 'success' }}{% endraw %}
+    steps:
+      - run: echo 'The triggering workflow passed'
+  on-failure:
+    runs-on: ubuntu-latest
+    if: {% raw %}${{ github.event.workflow_run.conclusion == 'failure' }}{% endraw %}
+    steps:
+      - run: echo 'The triggering workflow failed'
+```
+
+### Limiting your workflow to run based on branches
+
+You can use the `branches` or `branches-ignore` filter to specify what branches the triggering workflow must run on in order to trigger your workflow. For more information, see [AUTOTITLE](/actions/using-workflows/workflow-syntax-for-github-actions#onworkflow_runbranchesbranches-ignore). For example, a workflow with the following trigger will only run when the workflow named `Build` runs on a branch named `canary`.
+
+```yaml
+on:
+  workflow_run:
+    workflows: [Build]
+    types: [requested]
+    branches: [canary]
+```
+
+### Using data from the triggering workflow
+
+You can access the [`workflow_run` event payload](/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_run) that corresponds to the workflow that triggered your workflow. For example, if your triggering workflow generates artifacts, a workflow triggered with the `workflow_run` event can access these artifacts.
+
+The following workflow uploads data as an artifact. (In this simplified example, the data is the pull request number.)
+
+```yaml
+name: Upload data
+
+on:
+  pull_request:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Save PR number
+        env:
+          PR_NUMBER: {% raw %}${{ github.event.number }}{% endraw %}
+        run: |
+          mkdir -p ./pr
+          echo $PR_NUMBER > ./pr/pr_number
+      - uses: {% data reusables.actions.action-upload-artifact %}
+        with:
+          name: pr_number
+          path: pr/
+```
+
+When a run of the above workflow completes, it triggers a run of the following workflow. The following workflow uses the `github.event.workflow_run` context and the {% data variables.product.github %} REST API to download the artifact that was uploaded by the above workflow, unzips the downloaded artifact, and comments on the pull request whose number was uploaded as an artifact.
+
+```yaml
+name: Use the data
+
+on:
+  workflow_run:
+    workflows: [Upload data]
+    types:
+      - completed
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Download artifact'
+        uses: {% data reusables.actions.action-github-script %}
+        with:
+          script: |
+            let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               run_id: context.payload.workflow_run.id,
+            });
+            let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "pr_number"
+            })[0];
+            let download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: matchArtifact.id,
+               archive_format: 'zip',
+            });
+            const fs = require('fs');
+            const path = require('path');
+            const temp = '{% raw %}${{ runner.temp }}{% endraw %}/artifacts';
+            if (!fs.existsSync(temp)){
+              fs.mkdirSync(temp);
+            }
+            fs.writeFileSync(path.join(temp, 'pr_number.zip'), Buffer.from(download.data));
+
+      - name: 'Unzip artifact'
+        run: unzip pr_number.zip -d "{% raw %}${{ runner.temp }}{% endraw %}/artifacts"
+
+      - name: 'Comment on PR'
+        uses: {% data reusables.actions.action-github-script %}
+        with:
+          github-token: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const temp = '{% raw %}${{ runner.temp }}{% endraw %}/artifacts';
+            const issue_number = Number(fs.readFileSync(path.join(temp, 'pr_number')));
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue_number,
+              body: 'Thank you for the PR!'
+            });
+```
